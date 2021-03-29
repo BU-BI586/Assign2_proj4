@@ -113,7 +113,6 @@ plotMA(resStress, main="Stress vs Recovery", ylim=c(-2,2)) #sometimes nice to ha
 #fewer differentially expressed genes (in red) upregulated ; most of genes are downregulated (blue?)
 
 #********ASK ABOUT THIS -- what do the colors mean again?? is blue downregulated? red upregulated and we just have so few we can't see them? grey not differentially expressed?
-
 #put results into a dataframe
 results <- as.data.frame(resStress)
 head(results)
