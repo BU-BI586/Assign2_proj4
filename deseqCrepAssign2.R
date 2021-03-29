@@ -106,11 +106,12 @@ table(resStress$padj<0.01) #5093 reads, p-adjusted reads are 6 --> always use p-
 summary(resStress) #lots of genes removed bc of low counts; 0.1% of genes upregulated in stress relative to recovery, and 0.43% were downregulated under stress relative to recovery
 
 #another way to look at it, no. of differentially expressed genes (6)
-nrow(resStress[resStress$padj<0.01 & !is.na(resStress$padj),])  # Num significantly differentially expressed genes excluding the no/low count genes   #228
+nrow(resStress[resStress$padj<0.1 & !is.na(resStress$padj),])  # Num significantly differentially expressed genes excluding the no/low count genes   #228
 
 plotMA(resStress, main="Stress vs Recovery", ylim=c(-2,2)) #sometimes nice to have a ylim if your axes are weird
 #MA plot shows mean of normalized counts; left is more lowly expressed genes, right is higher expressed genes
 #fewer differentially expressed genes (in red) upregulated ; most of genes are downregulated (blue?)
+#neg fold change = downreg; blue is all diff expressed genes
 
 #********ASK ABOUT THIS -- what do the colors mean again?? is blue downregulated? red upregulated and we just have so few we can't see them? grey not differentially expressed?
 #put results into a dataframe
@@ -128,23 +129,6 @@ write.table(resStress, file="StressvRecovery.txt", quote=F, sep="\t")
 cd <- read.table("StressvRecovery.txt")
 head(cd)
 
-##make the GO table for MWU
-head(cd)
-
-library(dplyr)
-cd
-go_input = cd %>%
-  tibble::rownames_to_column(var = "iso") %>%
-  mutate(mutated_p = -log(pvalue)) %>%
-  mutate(mutated_p_updown = ifelse(log2FoldChange < 0, mutated_p*-1, mutated_p*1)) %>%
-  na.omit() %>%
-  select(iso, mutated_p_updown)
-#above code just took negative log of p value, then making either positive (upregulated) or negative (downregulated); ranked p value that also has directionality
-head(go_input) #one row for each gene that was diferentially expressed
-colnames(go_input) <- c("gene", "pval")
-head(go_input)
-write.csv(go_input, file="Stress_GO.csv", quote=F, row.names=FALSE) #this will be input for GO
-
 
 ###############################################################################################
 ##############################################################################
@@ -152,6 +136,8 @@ write.csv(go_input, file="Stress_GO.csv", quote=F, row.names=FALSE) #this will b
 #*********what are pvals and rlogdata??
 
 #--------------get pvals
+#normal pval - get from running deseq and contrasting functions
+#p val for one gene - if sig., it's diff expressed between treatment and control
 valStress=cbind(resStress$pvalue, resStress$padj)
 head(valStress)
 colnames(valStress)=c("pval.Stress", "padj.Stress")
@@ -165,30 +151,25 @@ length(valStress[,1])
 table(complete.cases(valStress))
 
 ######-------------make rlogdata and pvals table
+#for heatmap, dont want colors corresponding to p value -- want it to correspond to actual counts
+#for a PCoA, can't be based off P values, has to be differences in counts - need to normalize counts, can't just have raw counts (due to diffs in library size)
+#transforms coutns so we can compare between samples
 rlog=rlogTransformation(dds, blind=TRUE) 
 rld=assay(rlog)
 head(rld)
 colnames(rld)=paste(colData$treat)
-head(rld)
+head(rld) #these numbers represent transformed counts - some are neg bc of the log transform
 length(rld[,1])
 
 rldpvals=cbind(rld,valStress, valStress)
 head(rldpvals)
 dim(rldpvals)
-table(complete.cases(rldpvals))
+table(complete.cases(rldpvals)) #getting rid of p values that have NAs - data R wasn't able to calc a p value for (for many reasons: outlier, etc)
 
 write.csv(rldpvals, "RLDandPVALS.csv", quote=F)
+#putting counts and p values together
 
-colnames(rld)=paste(colData$treat)
-head(rld)
 
-library(RColorBrewer)
-# Sample distance heatmap
-sampleDists <- as.matrix(dist(t(rld)))
-library(gplots)
-heatmap.2(as.matrix(sampleDists), key=F, trace="none",
-          col=colorpanel(100, "black", "white"),
-          margin=c(10, 10), main="Sample Distance Matrix")
 
 # 2 stress samples that act similarly, and one stress sample that has different gene expression...lots of genes doing same thing, or different samples respond differently
 #if there's a strong signature, all stress samples would cluster together..here, 2/3 stress samples cluster, but third is odd
@@ -197,13 +178,19 @@ heatmap.2(as.matrix(sampleDists), key=F, trace="none",
 #################################################################################
 ###########################heat map of sample distances
 
-#**********how is this heatmap different from last one? Is it the same, just quantifying the differences between samples with numbers?
-
 rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
 head(rldpvals)
 rld=rldpvals[,1:6]
 head(rld)
 
+colnames(rld)=paste(colData$treat)
+head(rld)
+
+library(RColorBrewer)
+
+# Sample distance heatmap
+
+library(gplots)
 sampleDists <- dist(t(rld))
 sampleDistMatrix <- as.matrix( sampleDists )
 treat=c("Recovery", "Recovery", "Recovery", "Stress", "Stress", "Stress")
@@ -219,6 +206,7 @@ library(ggplot2)
 library(ggrepel)
 library(tidyverse)
 
+################################################
 #Run PCA
 rld_t=t(rld)
 pca <- prcomp(rld_t,center = TRUE)
@@ -255,7 +243,7 @@ adonis(pca$x ~ treat, data = pca_s, method='eu', na.rm = TRUE)
 
 #P = 0.1 - marginally significant, probably would be more significant if we had more samples
 
-###################################heatmaps for genes NS vs FR
+###################################heatmaps for genes treatment v control
 #*********what is NS vs FR?? What is the difference between this heatmap and the one below?
 
 rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
@@ -265,37 +253,34 @@ head(rld_site)
 gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
 head(gg)
 
-nrow(rldpvals[rldpvals$padj.Stress<0.01& !is.na(rldpvals$padj.Stress),])
-#We have 6 diferentially expressed genes
+nrow(rldpvals[rldpvals$padj.Stress<0.1& !is.na(rldpvals$padj.Stress),])
+#We have 121 diferentially expressed genes; we picked 0.1 as cutoff bc we have so few samples
+#We are not picking the top 100 because 121 is a manageable number to visualize
 
-#********DO we do this??? we only have 6 genes so we cant pick the top 100
-topnum= 100 # number of DEGS
+
+
+###################################Heatmap for all the genes
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
 head(rldpvals)
-top100=head(rldpvals[order(rldpvals$padj.Stress), ],topnum)
-head(top100)
-length(top100[,1])
-summary(top100)
-###
-library(pheatmap)
-head(top100)
 p.val=0.1 # FDR cutoff
-conds=top100[top100$padj.Stress<=p.val & !is.na(top100$padj.Stress),]
-length(conds[,1]) #********we get 0???
-
-exp=conds[,1:6] # change numbers to be your vsd data columns
-means=apply(exp,1,mean) # means of rows
-explc=exp-means # subtracting them
-head(explc)
+conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
+rld_data= conds[,c(1:6)]
+head(rld_data)
+nrow(rld_data)
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=2)
+library(pheatmap)
+means=apply(rld_data,1,mean) # means of rows
+explc=rld_data-means # subtracting them
 
 ccol=colorRampPalette(rev(c("red","chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
 col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
 
 pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
 
-###################################Heatmap for the genes in common
+###################################Heatmap for few genes to annotate
 rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
 head(rldpvals)
-p.val=0.1 # FDR cutoff
+p.val=0.01 # FDR cutoff
 conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
 rld_data= conds[,c(1:6)]
 head(rld_data)
@@ -310,7 +295,9 @@ col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(1
 
 pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
 
+
 # Make annotation table for pheatmap
+# make p value cutoff lower for this one
 ann = data.frame(cond = c('Recovery', 'Recovery', 'Recovery', 'Stress', 'Stress', 'Stress'))
 rownames(ann) <- names(explc)
 
