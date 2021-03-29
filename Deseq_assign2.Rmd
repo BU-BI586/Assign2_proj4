@@ -165,4 +165,181 @@ head(cd)
 
 ```
 
+###############################################################################################
+##############################################################################
+
+#*********what are pvals and rlogdata??
+
+#--------------get pvals
+#normal pval - get from running deseq and contrasting functions
+#p val for one gene - if sig., it's diff expressed between treatment and control
+valStress=cbind(resStress$pvalue, resStress$padj)
+head(valStress)
+colnames(valStress)=c("pval.Stress", "padj.Stress")
+length(valStress[,1])
+table(complete.cases(valStress))
+
+valStress=cbind(resStress$pvalue, resStress$padj)
+head(valStress)
+colnames(valStress)=c("pval.Stress", "padj.Stress")
+length(valStress[,1])
+table(complete.cases(valStress))
+
+######-------------make rlogdata and pvals table
+#for heatmap, dont want colors corresponding to p value -- want it to correspond to actual counts
+#for a PCoA, can't be based off P values, has to be differences in counts - need to normalize counts, can't just have raw counts (due to diffs in library size)
+#transforms coutns so we can compare between samples
+rlog=rlogTransformation(dds, blind=TRUE) 
+rld=assay(rlog)
+head(rld)
+colnames(rld)=paste(colData$treat)
+head(rld) #these numbers represent transformed counts - some are neg bc of the log transform
+length(rld[,1])
+
+rldpvals=cbind(rld,valStress, valStress)
+head(rldpvals)
+dim(rldpvals)
+table(complete.cases(rldpvals)) #getting rid of p values that have NAs - data R wasn't able to calc a p value for (for many reasons: outlier, etc)
+
+write.csv(rldpvals, "RLDandPVALS.csv", quote=F)
+#putting counts and p values together
+
+
+
+# 2 stress samples that act similarly, and one stress sample that has different gene expression...lots of genes doing same thing, or different samples respond differently
+#if there's a strong signature, all stress samples would cluster together..here, 2/3 stress samples cluster, but third is odd
+#the odd one out is the outlier?
+
+#################################################################################
+###########################heat map of sample distances
+
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
+head(rldpvals)
+rld=rldpvals[,1:6]
+head(rld)
+
+colnames(rld)=paste(colData$treat)
+head(rld)
+
+library(RColorBrewer)
+
+# Sample distance heatmap
+
+library(gplots)
+sampleDists <- dist(t(rld))
+sampleDistMatrix <- as.matrix( sampleDists )
+treat=c("Recovery", "Recovery", "Recovery", "Stress", "Stress", "Stress")
+colnames(sampleDistMatrix)=paste(treat)
+rownames(sampleDistMatrix)=paste(treat)
+
+library("pheatmap")
+heat.colors = colorRampPalette(rev(c("blue","yellow","red")),bias=0.3)(100)
+pheatmap(sampleDistMatrix,color = heat.colors,cex=0.9,border_color=NA,cluster_rows=T,cluster_cols=T)
+
+library(vegan)
+library(ggplot2)
+library(ggrepel)
+library(tidyverse)
+
+################################################
+#Run PCA
+rld_t=t(rld)
+pca <- prcomp(rld_t,center = TRUE)
+head(pca)
+li <- pca$sdev^2 / sum(pca$sdev^2)
+pc1v <- round(li[1] * 100, 1)
+pc2v <- round(li[2] * 100, 1)
+pca_s <- as.data.frame(pca$x)
+head(pca_s)
+pca_s <- pca_s[,c(1,2)]
+pca_s$Samples = row.names(pca_s)
+pca_s$treat=colData$treat
+head(pca_s)
+
+cbPalette <- c("darkgoldenrod2",  "darkolivegreen3", "dodgerblue3")
+ggplot(pca_s, aes(PC1, PC2, color = treat, pch = treat)) +
+  geom_point(size=3) +
+  #  geom_text_repel(aes(label=Samples)) +
+  scale_colour_manual(values=cbPalette)+
+  theme_bw() +
+  # geom_density2d(alpha=.5)+
+  geom_polygon(alpha=.2)+
+  xlab(paste0("PC1: ",pc1v,"% variance")) +
+  ylab(paste0("PC2: ",pc2v,"% variance")) 
+  head(pca)
+  
+#PCA -- samples group by stress vs recovery
+  #PC 1: 28.1% of the variance
+  #PC 2: 21.4% of the variance
+  #These two axes explain such little variance likely bc we have only 6 samples
+
+#Anova using distance matrices  
+adonis(pca$x ~ treat, data = pca_s, method='eu', na.rm = TRUE)
+
+#P = 0.1 - marginally significant, probably would be more significant if we had more samples
+
+###################################heatmaps for genes treatment v control
+#*********what is NS vs FR?? What is the difference between this heatmap and the one below?
+
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
+head(rldpvals)
+rld_site= rldpvals[,1:6]
+head(rld_site)
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
+head(gg)
+
+nrow(rldpvals[rldpvals$padj.Stress<0.1& !is.na(rldpvals$padj.Stress),])
+#We have 121 diferentially expressed genes; we picked 0.1 as cutoff bc we have so few samples
+#We are not picking the top 100 because 121 is a manageable number to visualize
+
+
+
+###################################Heatmap for all the genes
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
+head(rldpvals)
+p.val=0.1 # FDR cutoff
+conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
+rld_data= conds[,c(1:6)]
+head(rld_data)
+nrow(rld_data)
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=2)
+library(pheatmap)
+means=apply(rld_data,1,mean) # means of rows
+explc=rld_data-means # subtracting them
+
+ccol=colorRampPalette(rev(c("red","chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+
+pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
+
+###################################Heatmap for few genes to annotate
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
+head(rldpvals)
+p.val=0.01 # FDR cutoff
+conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
+rld_data= conds[,c(1:6)]
+head(rld_data)
+nrow(rld_data)
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
+library(pheatmap)
+means=apply(rld_data,1,mean) # means of rows
+explc=rld_data-means # subtracting them
+
+ccol=colorRampPalette(rev(c("red","chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+
+pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
+
+
+# Make annotation table for pheatmap
+# make p value cutoff lower for this one
+ann = data.frame(cond = c('Recovery', 'Recovery', 'Recovery', 'Stress', 'Stress', 'Stress'))
+rownames(ann) <- names(explc)
+
+# Set colors
+Var1        <- c("darkgoldenrod2","dodgerblue3")
+names(Var1) <- c("Recovery", "Stress")
+anno_colors <- list(cond = Var1)
+
+pheatmap(as.matrix(explc),annotation_col=ann,annotation_colors=anno_colors,cex=1.2,color=col0,border_color=NA,clustering_distance_rows="correlation",clustering_distance_cols="correlation", show_rownames=T)
 
