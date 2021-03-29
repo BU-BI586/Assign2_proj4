@@ -7,10 +7,9 @@
 setwd("~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4") #you will need to change to your own directory
 
 #Bioconductor install
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-BiocManager::install("DESeq2")
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+ # install.packages("BiocManager")
+#BiocManager::install("DESeq2")
 
 ###conduct array quality metrics to detect and remove outliers
 library(DESeq2) 
@@ -109,11 +108,11 @@ summary(resStress) #lots of genes removed bc of low counts; 0.1% of genes upregu
 #another way to look at it, no. of differentially expressed genes (6)
 nrow(resStress[resStress$padj<0.01 & !is.na(resStress$padj),])  # Num significantly differentially expressed genes excluding the no/low count genes   #228
 
-plotMA(resStress, main="Stress vs Recovery")
 plotMA(resStress, main="Stress vs Recovery", ylim=c(-2,2)) #sometimes nice to have a ylim if your axes are weird
 #MA plot shows mean of normalized counts; left is more lowly expressed genes, right is higher expressed genes
 #fewer differentially expressed genes (in red) upregulated ; most of genes are downregulated (blue?)
-#ASK ABOUT THIS -- what do the colors mean again?? is blue downregulated? red upregulated and we just have so few we can't see them? grey not differentially expressed?
+
+#********ASK ABOUT THIS -- what do the colors mean again?? is blue downregulated? red upregulated and we just have so few we can't see them? grey not differentially expressed?
 
 #put results into a dataframe
 results <- as.data.frame(resStress)
@@ -150,6 +149,9 @@ write.csv(go_input, file="Stress_GO.csv", quote=F, row.names=FALSE) #this will b
 
 ###############################################################################################
 ##############################################################################
+
+#*********what are pvals and rlogdata??
+
 #--------------get pvals
 valStress=cbind(resStress$pvalue, resStress$padj)
 head(valStress)
@@ -174,10 +176,7 @@ length(rld[,1])
 rldpvals=cbind(rld,valStress, valStress)
 head(rldpvals)
 dim(rldpvals)
-# [1] 19717    13
 table(complete.cases(rldpvals))
-#FALSE  TRUE 
-#17202  2515 
 
 write.csv(rldpvals, "RLDandPVALS.csv", quote=F)
 
@@ -194,18 +193,21 @@ heatmap.2(as.matrix(sampleDists), key=F, trace="none",
 
 # 2 stress samples that act similarly, and one stress sample that has different gene expression...lots of genes doing same thing, or different samples respond differently
 #if there's a strong signature, all stress samples would cluster together..here, 2/3 stress samples cluster, but third is odd
-
+#the odd one out is the outlier?
 
 #################################################################################
-###########################heat map of sample distances for pco2
-rldpvals <- read.csv(file="Crep2016_RLDandPVALS.csv", row.names=1)
+###########################heat map of sample distances
+
+#**********how is this heatmap different from last one? Is it the same, just quantifying the differences between samples with numbers?
+
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
 head(rldpvals)
-rld=rldpvals[,1:9]
+rld=rldpvals[,1:6]
 head(rld)
 
 sampleDists <- dist(t(rld))
 sampleDistMatrix <- as.matrix( sampleDists )
-treat=c( "pH7.5", "pH7.5", "pH7.5", "pH7.6", "pH7.6", "pH7.6", "pH8", "pH8",  "pH8")
+treat=c("Recovery", "Recovery", "Recovery", "Stress", "Stress", "Stress")
 colnames(sampleDistMatrix)=paste(treat)
 rownames(sampleDistMatrix)=paste(treat)
 
@@ -218,8 +220,9 @@ library(ggplot2)
 library(ggrepel)
 library(tidyverse)
 
+#Run PCA
 rld_t=t(rld)
-pca <- prcomp(rld_t,center = TRUE, scale. = TRUE)
+pca <- prcomp(rld_t,center = TRUE)
 head(pca)
 li <- pca$sdev^2 / sum(pca$sdev^2)
 pc1v <- round(li[1] * 100, 1)
@@ -242,27 +245,34 @@ ggplot(pca_s, aes(PC1, PC2, color = treat, pch = treat)) +
   xlab(paste0("PC1: ",pc1v,"% variance")) +
   ylab(paste0("PC2: ",pc2v,"% variance")) 
   head(pca)
-adonis(pca$x ~ treat, data = pca_s, method='eu', na.rm = TRUE)
-          # Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)   
-# treat      2     40140 20069.9  13.048 0.81306  0.003 **
-# Residuals  6      9229  1538.1         0.18694          
-# Total      8     49369                 1.00000 
+  
+#PCA -- samples group by stress vs recovery
+  #PC 1: 28.1% of the variance
+  #PC 2: 21.4% of the variance
+  #These two axes explain such little variance likely bc we have only 6 samples
 
+#Anova using distance matrices  
+adonis(pca$x ~ treat, data = pca_s, method='eu', na.rm = TRUE)
+
+#P = 0.1 - marginally significant, probably would be more significant if we had more samples
 
 ###################################heatmaps for genes NS vs FR
-rldpvals <- read.csv(file="Crep2016_RLDandPVALS.csv", row.names=1)
+#*********what is NS vs FR?? What is the difference between this heatmap and the one below?
+
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
 head(rldpvals)
-rld_site= rldpvals[,1:9]
+rld_site= rldpvals[,1:6]
 head(rld_site)
-gg=read.table("Crep454_iso2gene.tab",sep="\t", row.names=1)
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
 head(gg)
 
-nrow(rldpvals[rldpvals$padj.Stress<0.01& !is.na(rldpvals$padj.76),])
-#242
+nrow(rldpvals[rldpvals$padj.Stress<0.01& !is.na(rldpvals$padj.Stress),])
+#We have 6 diferentially expressed genes
 
+#********DO we do this??? we only have 6 genes so we cant pick the top 100
 topnum= 100 # number of DEGS
 head(rldpvals)
-top100=head(rldpvals[order(rldpvals$padj.76), ],topnum)
+top100=head(rldpvals[order(rldpvals$padj.Stress), ],topnum)
 head(top100)
 length(top100[,1])
 summary(top100)
@@ -270,10 +280,10 @@ summary(top100)
 library(pheatmap)
 head(top100)
 p.val=0.1 # FDR cutoff
-conds=top100[top100$padj.76<=p.val & !is.na(top100$padj.76),]
-length(conds[,1])
+conds=top100[top100$padj.Stress<=p.val & !is.na(top100$padj.Stress),]
+length(conds[,1]) #********we get 0???
 
-exp=conds[,1:9] # change numbers to be your vsd data columns
+exp=conds[,1:6] # change numbers to be your vsd data columns
 means=apply(exp,1,mean) # means of rows
 explc=exp-means # subtracting them
 head(explc)
@@ -284,14 +294,14 @@ col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(1
 pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
 
 ###################################Heatmap for the genes in common
-rldpvals <- read.csv(file="Crep2016_RLDandPVALS.csv", row.names=1)
+rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
 head(rldpvals)
 p.val=0.1 # FDR cutoff
-conds=rldpvals[rldpvals$padj.76<=p.val & !is.na(rldpvals$padj.76) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
-rld_data= conds[,c(1:9)]
+conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
+rld_data= conds[,c(1:6)]
 head(rld_data)
 nrow(rld_data)
-gg=read.table("Crep454_iso2gene.tab",sep="\t", row.names=1)
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
 library(pheatmap)
 means=apply(rld_data,1,mean) # means of rows
 explc=rld_data-means # subtracting them
@@ -302,12 +312,12 @@ col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(1
 pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
 
 # Make annotation table for pheatmap
-ann = data.frame(cond = c('7.5', '7.5', '7.5', '7.6', '7.6', '7.6', '8', '8', '8'))
+ann = data.frame(cond = c('Recovery', 'Recovery', 'Recovery', 'Stress', 'Stress', 'Stress'))
 rownames(ann) <- names(explc)
 
 # Set colors
-Var1        <- c("darkgoldenrod2",  "darkolivegreen3", "dodgerblue3")
-names(Var1) <- c("7.5", "7.6", "8")
+Var1        <- c("darkgoldenrod2","dodgerblue3")
+names(Var1) <- c("Recovery", "Stress")
 anno_colors <- list(cond = Var1)
 
 pheatmap(as.matrix(explc),annotation_col=ann,annotation_colors=anno_colors,cex=1.2,color=col0,border_color=NA,clustering_distance_rows="correlation",clustering_distance_cols="correlation", show_rownames=T)
