@@ -31,7 +31,6 @@ tidyverse 1.3.0<br>
 **Introduction:** The following analyses is based on "Gene Expression of Endangered Coral (Orbicella spp.) in Flower Garden Banks National Marine Sanctuary After Hurricane Harvey" (Wright et. al. 2019). After Hurricane Harvey, tissue samples were collected to study the impacts of the freshwater runoff on coral and symbionts. These samples were collected at two time points: September 2017 (stress) and October 2017 (recover) to study the gene expression of Orbicella faveolata and Orbicella franksi. Also studied was Breviolum minutum, an algal symbiont which showed differentially expressed genes (DEGs) at different sampling time points. This may be the algal symbiont's response to the freshwater event (change in habitat). The purpose of our assignment was to study these DEGs at two time points, the stress and recovery. By utilizing arrayQualityMetrics, we were able to identify outliers. DESeq2 was leveraged to identify these DEGs and create a statistical model to study the expression patterns. 
 
 
-
 **Conduct array quality metrics to detect and remove outliers**
 
 ```{r Packages, message=FALSE, warning=FALSE}
