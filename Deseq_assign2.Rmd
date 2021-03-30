@@ -7,7 +7,7 @@ output: html_document
 
 set your working directory
 ```{r}
-setwd("~/Desktop/BI586/Assign2_proj4")
+setwd("~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4")
 ```
 
 ```{r include=FALSE}
@@ -28,11 +28,11 @@ vegan 2.5-7<br>
 ggrepel 0.9.1<br>
 tidyverse 1.3.0<br> 
 
-**Introduction:** The following analyses is based on "Gene Expression of Endangered Coral (Orbicella spp.) in Flower Garden Banks National Marine Sanctuary After Hurricane Harvey" (Wright et. al. 2019). After Hurricane Harvey, tissue samples were collected to study the impacts of the freshwater runoff on coral and symbionts. These samples were collected at two time points: September 2017 (stress) and October 2017 (recover) to study the gene expression of Orbicella faveolata and Orbicella franksi. Also studied was Breviolum minutum, an algal symbiont which showed differentially expressed genes (DEGs) at different sampling time points. This may be the algal symbiont's response to the freshwater event (change in habitat). The purpose of our assignment was to study these DEGs at two time points, the stress and recovery. By utilizing arrayQualityMetrics, we were able to identify outliers. DESeq2 was leveraged to identify these DEGs and create a statistical model to study the expression patterns. 
+## **Introduction** 
+
+The following analyses is based on "Gene Expression of Endangered Coral (Orbicella spp.) in Flower Garden Banks National Marine Sanctuary After Hurricane Harvey" (Wright et. al. 2019). After Hurricane Harvey, tissue samples were collected to study the impacts of the freshwater runoff on coral and symbionts. These samples were collected at two time points: September 2017 (stress) and October 2017 (recover) to study the gene expression of Orbicella faveolata and Orbicella franksi. Also studied was Breviolum minutum, an algal symbiont which showed differentially expressed genes (DEGs) at different sampling time points. This may be the algal symbiont's response to the freshwater event (change in habitat). The purpose of our assignment was to study these DEGs at two time points, the stress and recovery. By utilizing arrayQualityMetrics, we were able to identify one outlier. DESeq2 was leveraged to identify these DEGs and create a statistical model to study the expression patterns. Our findings indicate that gene expression of algal symbionts groups by recovery vs. stress conditions. The majority of differentially expressed genes are upregulated during recovery relative to stress conditions, indicating that recovery following stressful periods leads to upregulation of symbiont gene pathways. Overall, our findings suggest that algal symbionts of coral hosts enact different gene expression pathways when exposed to and recovering from stressful events.
 
 
-
-**Conduct array quality metrics to detect and remove outliers**
 
 ```{r Packages, message=FALSE, warning=FALSE}
 library(DESeq2) 
@@ -48,20 +48,23 @@ library(ggrepel)
 library(tidyverse)
 ```
 
-**read in iso2gene tab separated file**
+We read in the iso2gene tab separated file with isogroup information.
 ```{r message=FALSE, warning=FALSE}
+setwd("~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4")
 gg=read.table("Bmin_iso2gene.tab",sep="\t")
 ```
 
-**read in counts** 
+We read in the mRNA counts.
 ```{r message=FALSE, warning=FALSE}
+setwd("~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4")
 countData <- read.table("allcounts_Harvey_Sym.txt") 
 head(countData)
 length(countData[,1])
 ```
 
+## **Conduct array quality metrics to detect and remove outliers.**
 
-**look for outliers**
+First, we looked for outliers.
 ```{r message=FALSE, warning=FALSE}
 treat=c( "Recovery", "Recovery", "Recovery", "Stress", "Stress", "Stress") #creating a condition table
 g=data.frame(treat)
@@ -69,14 +72,17 @@ g
 colData= g
 ```
 
-```{r echo=FALSE, fig.cap="**Figure X.** outliers"}
-knitr::include_graphics('/Users/simminishad/Desktop/BI586/Assign2_proj4/arrayQualityMetrics report for e/out hm.png')
-```
-```{r echo=FALSE, fig.cap="**Figure X.** outliers"}
-knitr::include_graphics('/Users/simminishad/Desktop/BI586/Assign2_proj4/arrayQualityMetrics report for e/out ma.png')
+```{r echo=FALSE, fig.cap="**Figure 1. Outlier detection for Distances between arrays.** Bar chart of the sum of distances to other arrays, one outlier detection method. A bar beyond the black line indicates the sample is an outlier. Sample 6, fav_stress_C has been detected as an outlier with this method."}
+knitr::include_graphics(path.expand('~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4/fig2.png'))
 ```
 
-**Convert the counts data, treatment information, and desired statistical model into a DESeq object.**
+```{r echo=FALSE, fig.cap="**Figure 2. Outlier detection for MA plots.** Bar chart of the sum of distances to other arrays, one outlier detection method. Bar chart of the Hoeffding's statistic, Da, another outlier detection criterion. A bar beyond the black line indicates the sample is an outlier. Sample 6, fav_stress_C has been detected as an outlier with this method."}
+knitr::include_graphics(path.expand('~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4/fig9.png'))
+```
+
+The sample fav_stressC was detected as an outlier via the Distances between arrays method (Figure X) and MA plot method (Figure X). For the purpose of this assignment, we will include it due to our very low sample size, but in a real scenario, we would exclude it.
+
+We next converted the counts data, treatment information, and desired statistical model into a DESeq object so that we can work with the data in DESeq.
 ```{r message=FALSE, warning=FALSE}
 dds=DESeqDataSetFromMatrix(countData=countData,
                            colData = g,
@@ -87,16 +93,12 @@ e=ExpressionSet(assay(rl), AnnotatedDataFrame(as.data.frame(colData(rl))))
 arrayQualityMetrics(e, intgroup=c("treat"),force=T) 
 ```
 
-
-**fav_stressC detected as outliers via the Distances between arrays method (Figure 2) and MA plot method (Figure 9). For the purpose of this assignment, we will include it, but in a real scenario we would exclude it.**
-
-
-**one step DESeq that does the following: estimating size factors, estimating dispersions, gene-wise dispersion estimates, mean-dispersion relationship, final dispersion estimates, fitting model and testing.**
+One step DESeq does the following: estimates size factors, estimates dispersions, generates gene-wise dispersion estimates, generates the mean-dispersion relationship, final dispersion estimates, and fits and tests the model.
 ```{r message=FALSE, warning=FALSE}
 dds<-DESeq(dds)
 ```
 
-**These results allow us to make sure nothing abnormal is going on. The post-normalized counts are pvalues that correspond to see how differentially expressed a gene is between treatments. padj adjusts pvalues for multiple tests. The baseMean is average count for one comparison (whichever treatment group came first). log2FoldChange shows differentiation in counts between the basemean vs other treatment group. The recovery treatment group had avg of 5.57 counts; stress group had a 2fold change (logtransformed).**
+These results allow us to make sure nothing abnormal is going on. The post-normalized counts are pvalues that correspond to how differentially expressed a gene is between treatments. padj adjusts pvalues for multiple tests. The baseMean is the average count for one comparison (whichever treatment group came first). log2FoldChange shows differentiation in counts between the basemean vs other treatment group. The recovery treatment group had avg of 5.57 counts; stress group had a 2fold change (logtransformed).
 
 ```{r message=FALSE, warning=FALSE}
 head(dds)
@@ -104,17 +106,15 @@ res<- results(dds)
 res
 ```
 
-
-
-**This is the normalization method.**
-```{r message=FALSE, warning=FALSE, fig.cap= "**Figure X.** The dispersion plot visualizes what DEseq2 is doing to our data; fitting it to this curve."}
+Next, we generate a dispersion plot that visualizes what DESeq2 is doing to our data and fits it to this curve. The plot should look like a hockey stick, so this plot is adequate.
+```{r message=FALSE, warning=FALSE, fig.cap= "**Figure 3. Wright et al. 2019 symbiont dispersion plot.**"}
 plotDispEsts(dds, main="Wright et al. 2019 symbiont dispersion plot")
 ```
 
 
-**Stress vs recovery pairwise comparisons**
+## **Stress vs. recovery comparison to identify differentially expressed genes**
 
-**We can only do pairwise comparisons. Levels are used because gene expression is always relative; the first term is the treatment and the second term is the one that's relative (treatment 1st, control 2nd)**
+We can only do pairwise comparisons. Levels are used because gene expression is always relative; the first term is the treatment and the second term is the one that's relative (treatment 1st, control 2nd).
 ```{r message=FALSE, warning=FALSE}
 colData$Stress<-factor(colData$treat, levels=c("Stress","Recovery"))
 ```
@@ -123,127 +123,126 @@ colData$Stress<-factor(colData$treat, levels=c("Stress","Recovery"))
 resStress <- results(dds, contrast=c("treat","Stress","Recovery"))
 ```
 
-**False discovery rate pvalues are adjusted to < 10%**
+False discovery rate pvalues are adjusted to < 10%
 ```{r message=FALSE, warning=FALSE}
-table(resStress$padj<0.01)
+table(resStress$padj<0.1)
 ```
 
-**Of the 5093 reads, p-adjusted reads are 6. p-adjusted values are used to look at numbers of differentially expressed genes - here we have 6 diferentially expressed genes.p-adjusted accounts for all the different times things are compared. Without adjustment we could get a false positive by chance.**
+Of the 4972 reads, p-adjusted reads are 121. p-adjusted values are used to look at numbers of differentially expressed genes - here we have 121 diferentially expressed genes.p-adjusted accounts for all the different times genes are compared. Without adjustment we could get a false positive by chance.
 
 ```{r message=FALSE, warning=FALSE}
 summary(resStress)
 ```
 
-**A lot of genes were removed due to low counts; 0.1% of genes upregulated in stress relative to recovery, and 0.43% were downregulated under stress relative to recovery**
+A lot of genes were removed due to low counts; 0.1% of genes upregulated in stress relative to recovery, and 0.43% were downregulated under stress relative to recovery.
 
-**This is another way to look at the number of differentially expressed genes (6). The number of significantly differentially expressed genes excluding the no/low count genes.**
-
+Below is another way to look at the number of significantly differentially expressed genes, excluding the no/low count genes.
 ```{r message=FALSE, warning=FALSE}
 nrow(resStress[resStress$padj<0.1 & !is.na(resStress$padj),])
 ```
-  
 
-```{r message=FALSE, warning=FALSE, fig.cap= "**Figure X.** MA plot shows the mean of normalized counts. The left is more lowly expressed genes abd right is higher expressed genes. The blue is all the differentially expressed genes. Negative fold change is downregulated genes and postitive fold change is upregulated genes."}
-plotMA(resStress, main="Stress vs Recovery", ylim=c(-2,2))
+
+```{r message=FALSE, warning=FALSE, fig.cap= "**Figure 4. MA plot.** The MA plot shows the mean of normalized counts. The X axis shows the means of the normalized gene counts, with lowly expressed genes to the left and highly expressed genes to the right. The Y axis shows the log fold change in gene expression. Negative log fold change is downregulated genes and postitive fold change is upregulated genes. The blue points represent differentially expressed genes."}
+plotMA(resStress, main="Stress vs Recovery")
 ```
 
 
 
 
-**Our results are put in a data frame. 23 are upregulated and 98 are downregulated.**
+Our results are put in a data frame, 'resStress'. We can look at the number of rows in the dataframe separated by up- or downregulated genes. 23 genes are upregulated and 98 genes are downregulated.
 ```{r message=FALSE, warning=FALSE}
 results <- as.data.frame(resStress)
-head(results)
 nrow(resStress[resStress$padj<0.1 & resStress$log2FoldChange > 0 & !is.na(resStress$padj),]) #no. genes upregulated
 nrow(resStress[resStress$padj<0.1 & resStress$log2FoldChange < 0 & !is.na(resStress$padj),]) #no. genes downregulated
 ```
 
 
-**A supplementary table of info.**
+We create a table from the 'resStress' dataframe. This is where we will pull our p-values and p-adjusted values from in later steps. 
 ```{r message=FALSE, warning=FALSE}
 write.table(resStress, file="StressvRecovery.txt", quote=F, sep="\t")
 ```
 
 ```{r message=FALSE, warning=FALSE}
 cd <- read.table("StressvRecovery.txt")
-head(cd)
 ```
 
-###############################################################################################
-##############################################################################
 
-#*********what are pvals and rlogdata??
+## **Adjusting P-Values & Log Transforming Data**
 
-#--------------get pvals
-#normal pval - get from running deseq and contrasting functions
-#p val for one gene - if sig., it's diff expressed between treatment and control
+P-values were initially found by running DESeq2 and contrasting functions. These indicate whether the number of differentially expressed genes between Stressed and Recovery samples were significantly different or not. Each p-value correlates to a gene. If a gene's p-value is significant (set at a threshold of <0.01), it suggests that it's differentially expressed between the two samples.
+
+We used the following code to create a table comparing the original p-values to the adjusted p-values. P-values are adjusted to reduce error.
+```{r, eval=FALSE}
 valStress=cbind(resStress$pvalue, resStress$padj)
-head(valStress)
 colnames(valStress)=c("pval.Stress", "padj.Stress")
-length(valStress[,1])
-table(complete.cases(valStress))
+```
 
+The total amount of p-values calculated, including samples with no or low counts, is 31999. This can be found using the following code:
+```{r, eval=FALSE}
+length(valStress[,1])
+```
+
+5093 of the 31999 reads had low-count data resulting in NA's; these were found and removed using the following code:
+```{r, eval=FALSE}
+table(complete.cases(valStress))
+```
+
+We used the following code to create an rlogdata table to compare the log transformed mean counts of each gene in the three Recovery and three Stressed samples. This allowed us to normalize counts so we can use the data to compare between samples.
+```{r, include=FALSE}
 valStress=cbind(resStress$pvalue, resStress$padj)
-head(valStress)
-colnames(valStress)=c("pval.Stress", "padj.Stress")
-length(valStress[,1])
-table(complete.cases(valStress))
-
-######-------------make rlogdata and pvals table
-#for heatmap, dont want colors corresponding to p value -- want it to correspond to actual counts
-#for a PCoA, can't be based off P values, has to be differences in counts - need to normalize counts, can't just have raw counts (due to diffs in library size)
-#transforms coutns so we can compare between samples
 rlog=rlogTransformation(dds, blind=TRUE) 
 rld=assay(rlog)
-head(rld)
 colnames(rld)=paste(colData$treat)
-head(rld) #these numbers represent transformed counts - some are neg bc of the log transform
 length(rld[,1])
-
 rldpvals=cbind(rld,valStress, valStress)
-head(rldpvals)
+```
+
+To find the dimensions of the new "rldpvals" variable, use following code:
+```{r, eval=TRUE}
 dim(rldpvals)
-table(complete.cases(rldpvals)) #getting rid of p values that have NAs - data R wasn't able to calc a p value for (for many reasons: outlier, etc)
+```
 
+Create a .csv file of rlogdata and adjusted p-values using the following code:
+```{r, include=FALSE}
 write.csv(rldpvals, "RLDandPVALS.csv", quote=F)
-#putting counts and p values together
+```
 
+## **Data visualizations**
 
+### Creating a Sample Distance Heatmap
 
-# 2 stress samples that act similarly, and one stress sample that has different gene expression...lots of genes doing same thing, or different samples respond differently
-#if there's a strong signature, all stress samples would cluster together..here, 2/3 stress samples cluster, but third is odd
-#the odd one out is the outlier?
-
-#################################################################################
-###########################heat map of sample distances
-
+Using the RColorBrewer and gplots packages, a heatmap of sample distances was created.
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
-head(rldpvals)
 rld=rldpvals[,1:6]
-head(rld)
+```
 
-colnames(rld)=paste(colData$treat)
-head(rld)
-
-library(RColorBrewer)
-
-# Sample distance heatmap
-
-library(gplots)
+```{r, include=FALSE, echo=FALSE}
 sampleDists <- dist(t(rld))
 sampleDistMatrix <- as.matrix( sampleDists )
 treat=c("Recovery", "Recovery", "Recovery", "Stress", "Stress", "Stress")
 colnames(sampleDistMatrix)=paste(treat)
 rownames(sampleDistMatrix)=paste(treat)
+```
 
-library("pheatmap")
+
+```{r, echo=FALSE}
+ library("pheatmap")
+```
+```{r, echo=FALSE, fig.cap= "**Figure 5. Sample comparison heatmap** This heatmap depicts a comparison between genes found in each of the six sampling locations, in either Stress or Recovery periods, and quantifies their degree of similarity in expression. A value near zero indicates similarity between samples, and a higher number indicates a greater degree of difference. Two stress samples act similarly and cluster together, displaying a strong signature. The third stress sample does not cluster, suggesting that it's an outlier."}
 heat.colors = colorRampPalette(rev(c("blue","yellow","red")),bias=0.3)(100)
 pheatmap(sampleDistMatrix,color = heat.colors,cex=0.9,border_color=NA,cluster_rows=T,cluster_cols=T)
+```
+
+```{r, echo=FALSE}
 library(vegan)
 library(ggplot2)
 library(ggrepel)
 library(tidyverse)
-## Principal Components Analysis
+```
+
+
+### Principal Components Analysis
 
 Next, we run a Principal Components Analysis (PCA) to see how the gene expression of each of our 6 samples group together based on similarity.
 ```{r}
@@ -266,7 +265,7 @@ head(pca_s)
 ```
 The above table contains our final coordinates for each sample on the principal component axes. We next plot the PCA below.
 
-```{r, fig.cap="**Figure 2. Principal components analysis of gene expression of stress vs recovery samples.** PC1 explains 28.1% of the variance and PC2 explains 21.4% of the variance, for a total of 49.5% of variance explained by the first two principal components. The gene expression of the samples groups by stress vs recovery."}
+```{r, fig.cap="**Figure 6. Principal components analysis of gene expression of stress vs recovery samples.** PC1 explains 28.1% of the variance and PC2 explains 21.4% of the variance, for a total of 49.5% of variance explained by the first two principal components. The gene expression of the samples groups by stress vs recovery."}
 cbPalette <- c("darkgoldenrod2",  "darkolivegreen3", "dodgerblue3")
 ggplot(pca_s, aes(PC1, PC2, color = treat, pch = treat)) +
   geom_point(size=3) +
@@ -288,8 +287,6 @@ adonis(pca$x ~ treat, data = pca_s, method='eu', na.rm = TRUE)
 
 This output tells us that the P-value ["Pr(>F)"] is 0.1. Thus, the two treatments are not significantly different, but are marginally different. However, because of our low sample size and strong visual clustering of treatments on the plotted PCA, we conclude that there is likely a difference in the gene expression of coral symbionts in the stressed versus recovery conditions. 
 
-## Heatmaps
-
 To create heatmaps to visualize the gene expression across our samples, we take the P-values and Rlog data, and read in the .csv with gene annotations. 
 
 ```{r, message=FALSE, warning = FALSE}
@@ -302,11 +299,11 @@ nrow(rldpvals[rldpvals$padj.Stress<0.1& !is.na(rldpvals$padj.Stress),])
 
 The above output displays how many differentially expressed genes we have using a p-value threshold of 0.1: 121 genes. We picked 0.1 as the P-value cutoff because we have very few samples, so we will not find many significantly differentially expressed genes with a very strict P-value. 
 
-###Heatmap with all differentially expressed genes
+### Heatmap with all differentially expressed genes
 
 121 differentially expressed genes is a manageable number of genes to visualize, so we created a heatmap with all the differentially expressed genes.
 
-```{r, fig.cap="**Figure X. Heatmap of all differentially expressed genes between stress and recovery conditions.** Each row of rectangles represents one differentially expressed gene. The x axis shows the 6 samples analyzed. The legend displays the level of up- or downregulation. 2 (orange) indicates that the gene is more upregulated relative to the other treatment, while -2 (teal) indicates that the gene is more downregulated relative to the other treatment. 121 genes were differentially expressed with a p-value cutoff of 0.1. For the majority of differentially expressed genes, they were upregulated during recovery relative to stress conditions.}
+```{r, message=FALSE, warning=FALSE, fig.cap="**Figure 7. Heatmap of all differentially expressed genes between stress and recovery conditions.** Each row of rectangles represents one differentially expressed gene. The x axis shows the 6 samples analyzed. The legend displays the level of up- or downregulation. 2 (orange) indicates that the gene is more upregulated relative to the other treatment, while -2 (teal) indicates that the gene is more downregulated relative to the other treatment. 121 genes were differentially expressed with a p-value cutoff of 0.1. For the majority of differentially expressed genes, they were upregulated during recovery relative to stress conditions."}
 
 p.val=0.1 #this is the False Discovery Rate cutoff
 conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
@@ -323,7 +320,7 @@ pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
 
 This figure shows that for the majority of differentially expressed genes, they were upregulated during recovery relative to stress conditions. However, there is a small chunk of genes that were upregulated under stress relative to recovery conditions (in the bottom of the heatmap). 
 
-###Heatmap with annotated genes
+### Heatmap with annotated genes
 
 Next, we wanted to create a heatmap with annotated genes so we know which genes are being differentially expressed between stress and recovery conditions. Because a heatmap with 122 annotated genes would be overwhelming, we chose to create a heatmap with only the strongest differentially expressed genes. So, we changed our p-value cutoff to 0.01 to capture and annotate only the highly significant differentially expressed genes. 
 
@@ -348,7 +345,7 @@ pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
 
 Next, we added gene annotations and set colors with the following code.
 
-```{r, fig.cap="**Figure X. Heatmap of top 6 differentially expressed genes.** Each row of rectangles represents one differentially expressed gene. The x axis shows the 6 samples analyzed. The legend displays the level of up- or downregulation. 2 (orange) indicates that the gene is more upregulated relative to the other treatment, while -2 (teal) indicates that the gene is more downregulated relative to the other treatment. 6 genes were differentially expressed with a p-value cutoff of 0.01.}
+```{r, fig.cap="**Figure 8. Heatmap of top 6 differentially expressed genes.** Each row of rectangles represents one differentially expressed gene. The x axis shows the 6 samples analyzed. The legend displays the level of up- or downregulation. 2 (orange) indicates that the gene is more upregulated relative to the other treatment, while -2 (teal) indicates that the gene is more downregulated relative to the other treatment. 6 genes were differentially expressed with a p-value cutoff of 0.01."}
 ann = data.frame(cond = c('Recovery', 'Recovery', 'Recovery', 'Stress', 'Stress', 'Stress'))
 rownames(ann) <- names(explc)
 
@@ -359,4 +356,8 @@ anno_colors <- list(cond = Var1)
 pheatmap(as.matrix(explc),annotation_col=ann,annotation_colors=anno_colors,cex=1.2,color=col0,border_color=NA,clustering_distance_rows="correlation",clustering_distance_cols="correlation", show_rownames=T)
 ```
 In this figure, we see that 3 of 6 genes are more upregulated in the recovery relative to the stress conditions. Two genes are highly upregulated in just one of the stressed samples. One gene is upregulated in all stressed samples relative to the recovery samples. 
+
+## Conclusion
+
+Our findings indicate that gene expression of algal symbionts groups by recovery vs. stress conditions. The majority of differentially expressed genes are upregulated during recovery relative to stress conditions, indicating that recovery following stressful periods leads to upregulation of symbiont gene pathways. Overall, our findings suggest that algal symbionts of coral hosts enact different gene expression pathways when exposed to and recovering from stressful events.
 

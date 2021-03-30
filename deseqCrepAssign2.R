@@ -286,7 +286,9 @@ conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldp
 rld_data= conds[,c(1:6)]
 head(rld_data)
 nrow(rld_data)
-gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
+#gg=read.table("Bmin_iso2gene.tab",sep="\t")
+#gg[gg=="-"]<-NA
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=2)
 library(pheatmap)
 means=apply(rld_data,1,mean) # means of rows
 explc=rld_data-means # subtracting them
