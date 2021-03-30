@@ -245,21 +245,30 @@ library(ggplot2)
 library(ggrepel)
 library(tidyverse)
 
-################################################
-#Run PCA
+## Principal Components Analysis
+
+Next, we run a Principal Components Analysis (PCA) to see how the gene expression of each of our 6 samples group together based on similarity.
+```{r}
 rld_t=t(rld)
 pca <- prcomp(rld_t,center = TRUE)
-head(pca)
 li <- pca$sdev^2 / sum(pca$sdev^2)
 pc1v <- round(li[1] * 100, 1)
 pc2v <- round(li[2] * 100, 1)
 pca_s <- as.data.frame(pca$x)
 head(pca_s)
+```
+
+The above table shows us the coordinates of each sample on each of the 6 principal components. The principal components 1 through 6 explain decreasing amounts of variation in the data, with 1 explaining the most variation and 6 the least. We select out the first two principal components below so that we can plot the PCA on 2 axes. 
+
+```{r}
 pca_s <- pca_s[,c(1,2)]
 pca_s$Samples = row.names(pca_s)
 pca_s$treat=colData$treat
 head(pca_s)
+```
+The above table contains our final coordinates for each sample on the principal component axes. We next plot the PCA below.
 
+```{r, fig.cap="**Figure 2. Principal components analysis of gene expression of stress vs recovery samples.** PC1 explains 28.1% of the variance and PC2 explains 21.4% of the variance, for a total of 49.5% of variance explained by the first two principal components. The gene expression of the samples groups by stress vs recovery."}
 cbPalette <- c("darkgoldenrod2",  "darkolivegreen3", "dodgerblue3")
 ggplot(pca_s, aes(PC1, PC2, color = treat, pch = treat)) +
   geom_point(size=3) +
@@ -270,43 +279,64 @@ ggplot(pca_s, aes(PC1, PC2, color = treat, pch = treat)) +
   geom_polygon(alpha=.2)+
   xlab(paste0("PC1: ",pc1v,"% variance")) +
   ylab(paste0("PC2: ",pc2v,"% variance")) 
-  head(pca)
-  
-#PCA -- samples group by stress vs recovery
-  #PC 1: 28.1% of the variance
-  #PC 2: 21.4% of the variance
-  #These two axes explain such little variance likely bc we have only 6 samples
+```
 
-#Anova using distance matrices  
+From this plot, we can see that the symbiont gene expression of the samples groups by treatment (stress vs. recovery). Together, the first two principal components explain 49.5% of the variance in the data. The percentage of variance explained is likely low because we only included 6 samples in the analysis. 
+
+To see if the clustering of gene expression of the two treatments on the principal component axes is significantly different, we run an analysis of variance with distance matrices. 
+```{r, message = FALSE}
 adonis(pca$x ~ treat, data = pca_s, method='eu', na.rm = TRUE)
+```
 
-#P = 0.1 - marginally significant, probably would be more significant if we had more samples
+This output tells us that the P-value ["Pr(>F)"] is 0.1. Thus, the two treatments are not significantly different, but are marginally different. However, because of our low sample size and strong visual clustering of treatments on the plotted PCA, we conclude that there is likely a difference in the gene expression of coral symbionts in the stressed versus recovery conditions. 
 
-###################################heatmaps for genes treatment v control
-#*********what is NS vs FR?? What is the difference between this heatmap and the one below?
+## Heatmaps
 
+To create heatmaps to visualize the gene expression across our samples, we take the P-values and Rlog data, and read in the .csv with gene annotations. 
+
+```{r, message=FALSE, warning = FALSE}
+setwd("~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4")
 rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
-head(rldpvals)
 rld_site= rldpvals[,1:6]
-head(rld_site)
 gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
-head(gg)
-
 nrow(rldpvals[rldpvals$padj.Stress<0.1& !is.na(rldpvals$padj.Stress),])
-#We have 121 diferentially expressed genes; we picked 0.1 as cutoff bc we have so few samples
-#We are not picking the top 100 because 121 is a manageable number to visualize
+```
 
+The above output displays how many differentially expressed genes we have using a p-value threshold of 0.1: 121 genes. We picked 0.1 as the P-value cutoff because we have very few samples, so we will not find many significantly differentially expressed genes with a very strict P-value. 
 
+###Heatmap with all differentially expressed genes
 
-###################################Heatmap for all the genes
-rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
-head(rldpvals)
-p.val=0.1 # FDR cutoff
+121 differentially expressed genes is a manageable number of genes to visualize, so we created a heatmap with all the differentially expressed genes.
+
+```{r, fig.cap="**Figure X. Heatmap of all differentially expressed genes between stress and recovery conditions.** Each row of rectangles represents one differentially expressed gene. The x axis shows the 6 samples analyzed. The legend displays the level of up- or downregulation. 2 (orange) indicates that the gene is more upregulated relative to the other treatment, while -2 (teal) indicates that the gene is more downregulated relative to the other treatment. 121 genes were differentially expressed with a p-value cutoff of 0.1. For the majority of differentially expressed genes, they were upregulated during recovery relative to stress conditions.}
+
+p.val=0.1 #this is the False Discovery Rate cutoff
+conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
+rld_data= conds[,c(1:6)]
+library(pheatmap)
+means=apply(rld_data,1,mean) # means of rows
+explc=rld_data-means # subtracting them
+
+ccol=colorRampPalette(rev(c("red","chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+
+pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
+```
+
+This figure shows that for the majority of differentially expressed genes, they were upregulated during recovery relative to stress conditions. However, there is a small chunk of genes that were upregulated under stress relative to recovery conditions (in the bottom of the heatmap). 
+
+###Heatmap with annotated genes
+
+Next, we wanted to create a heatmap with annotated genes so we know which genes are being differentially expressed between stress and recovery conditions. Because a heatmap with 122 annotated genes would be overwhelming, we chose to create a heatmap with only the strongest differentially expressed genes. So, we changed our p-value cutoff to 0.01 to capture and annotate only the highly significant differentially expressed genes. 
+
+First, we generated the heatmap with the p-value cutoff of 0.01 without annotations. 6 genes are differentially expressed with a p-value of 0.01.
+
+```{r}
+p.val=0.01 # changing the False Discovery Rate cutoff
 conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
 rld_data= conds[,c(1:6)]
 head(rld_data)
 nrow(rld_data)
-gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=2)
 library(pheatmap)
 means=apply(rld_data,1,mean) # means of rows
 explc=rld_data-means # subtracting them
@@ -316,33 +346,19 @@ col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(1
 
 pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
 
-###################################Heatmap for few genes to annotate
-rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
-head(rldpvals)
-p.val=0.01 # FDR cutoff
-conds=rldpvals[rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress) & rldpvals$padj.Stress<=p.val & !is.na(rldpvals$padj.Stress),]
-rld_data= conds[,c(1:6)]
-head(rld_data)
-nrow(rld_data)
-gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
-library(pheatmap)
-means=apply(rld_data,1,mean) # means of rows
-explc=rld_data-means # subtracting them
+```
 
-ccol=colorRampPalette(rev(c("red","chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
-col0=colorRampPalette(rev(c("chocolate1","#FEE090","grey10", "cyan3","cyan")))(100)
+Next, we added gene annotations and set colors with the following code.
 
-pheatmap(explc,cluster_cols=T,scale="row",color=col0, show_rownames = F)
-
-
-# Make annotation table for pheatmap
-# make p value cutoff lower for this one
+```{r, fig.cap="**Figure X. Heatmap of top 6 differentially expressed genes.** Each row of rectangles represents one differentially expressed gene. The x axis shows the 6 samples analyzed. The legend displays the level of up- or downregulation. 2 (orange) indicates that the gene is more upregulated relative to the other treatment, while -2 (teal) indicates that the gene is more downregulated relative to the other treatment. 6 genes were differentially expressed with a p-value cutoff of 0.01.}
 ann = data.frame(cond = c('Recovery', 'Recovery', 'Recovery', 'Stress', 'Stress', 'Stress'))
 rownames(ann) <- names(explc)
 
-# Set colors
 Var1        <- c("darkgoldenrod2","dodgerblue3")
 names(Var1) <- c("Recovery", "Stress")
 anno_colors <- list(cond = Var1)
 
 pheatmap(as.matrix(explc),annotation_col=ann,annotation_colors=anno_colors,cex=1.2,color=col0,border_color=NA,clustering_distance_rows="correlation",clustering_distance_cols="correlation", show_rownames=T)
+```
+In this figure, we see that 3 of 6 genes are more upregulated in the recovery relative to the stress conditions. Two genes are highly upregulated in just one of the stressed samples. One gene is upregulated in all stressed samples relative to the recovery samples. 
+
