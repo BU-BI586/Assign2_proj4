@@ -246,11 +246,12 @@ adonis(pca$x ~ treat, data = pca_s, method='eu', na.rm = TRUE)
 ###################################heatmaps for genes treatment v control
 #*********what is NS vs FR?? What is the difference between this heatmap and the one below?
 
+setwd("~/Desktop/BU/PhD/Spring_2021_classes/Ecological_genomics/Assign2/Project4")
 rldpvals <- read.csv(file="RLDandPVALS.csv", row.names=1)
 head(rldpvals)
 rld_site= rldpvals[,1:6]
 head(rld_site)
-gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=1)
+gg=read.table("Bmin_iso2gene.tab",sep="\t", row.names=2)
 head(gg)
 
 nrow(rldpvals[rldpvals$padj.Stress<0.1& !is.na(rldpvals$padj.Stress),])
