@@ -28,7 +28,7 @@ vegan 2.5-7<br>
 ggrepel 0.9.1<br>
 tidyverse 1.3.0<br> 
 
-**Introduction:** The Flower and Garden Banks has been enduring minor events for decades until July 2016 when a mortality event occurred. After Hurricane Harvey, tissue samples were collected to study the impacts of the freshwater runoff on coral and symbionts. These samples were collected at two time points: September 2017 (stress) and October 2017 (recover) to study the gene expression of Orbicella faveolata and Orbicella franksi. Also studied was Breviolum minutum, an algal symbiont which showed differentially expressed genes (DEGs) at different sampling time points. This may be the algal symbiont's response to the freshwater event (change in habitat). The purpose of our assignment was to study these DEGs at two time points, the stress and recovery. By utilizing arrayQualityMetrics, we were able to identify outliers. DESeq2 was leveraged to identify these DEGs and create a statistical model to study the expression patterns. 
+**Introduction:** The following analyses is based on "Gene Expression of Endangered Coral (Orbicella spp.) in Flower Garden Banks National Marine Sanctuary After Hurricane Harvey" (Wright et. al. 2019). After Hurricane Harvey, tissue samples were collected to study the impacts of the freshwater runoff on coral and symbionts. These samples were collected at two time points: September 2017 (stress) and October 2017 (recover) to study the gene expression of Orbicella faveolata and Orbicella franksi. Also studied was Breviolum minutum, an algal symbiont which showed differentially expressed genes (DEGs) at different sampling time points. This may be the algal symbiont's response to the freshwater event (change in habitat). The purpose of our assignment was to study these DEGs at two time points, the stress and recovery. By utilizing arrayQualityMetrics, we were able to identify outliers. DESeq2 was leveraged to identify these DEGs and create a statistical model to study the expression patterns. 
 
 
 
@@ -74,7 +74,6 @@ colData= g
 dds=DESeqDataSetFromMatrix(countData=countData,
                            colData = g,
                            design = ~treat)
-
 vsd.ge=assay(vst(dds))
 rl=vst(dds)
 e=ExpressionSet(assay(rl), AnnotatedDataFrame(as.data.frame(colData(rl))))
@@ -148,7 +147,6 @@ plotMA(resStress, main="Stress vs Recovery", ylim=c(-2,2))
 ```{r message=FALSE, warning=FALSE}
 results <- as.data.frame(resStress)
 head(results)
-
 nrow(resStress[resStress$padj<0.1 & resStress$log2FoldChange > 0 & !is.na(resStress$padj),]) #no. genes upregulated
 nrow(resStress[resStress$padj<0.1 & resStress$log2FoldChange < 0 & !is.na(resStress$padj),]) #no. genes downregulated
 ```
@@ -162,7 +160,6 @@ write.table(resStress, file="StressvRecovery.txt", quote=F, sep="\t")
 ```{r message=FALSE, warning=FALSE}
 cd <- read.table("StressvRecovery.txt")
 head(cd)
-
 ```
 
 ###############################################################################################
@@ -342,4 +339,3 @@ names(Var1) <- c("Recovery", "Stress")
 anno_colors <- list(cond = Var1)
 
 pheatmap(as.matrix(explc),annotation_col=ann,annotation_colors=anno_colors,cex=1.2,color=col0,border_color=NA,clustering_distance_rows="correlation",clustering_distance_cols="correlation", show_rownames=T)
-
