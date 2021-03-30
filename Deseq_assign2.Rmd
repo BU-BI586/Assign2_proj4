@@ -239,12 +239,10 @@ rownames(sampleDistMatrix)=paste(treat)
 library("pheatmap")
 heat.colors = colorRampPalette(rev(c("blue","yellow","red")),bias=0.3)(100)
 pheatmap(sampleDistMatrix,color = heat.colors,cex=0.9,border_color=NA,cluster_rows=T,cluster_cols=T)
-
 library(vegan)
 library(ggplot2)
 library(ggrepel)
 library(tidyverse)
-
 ## Principal Components Analysis
 
 Next, we run a Principal Components Analysis (PCA) to see how the gene expression of each of our 6 samples group together based on similarity.
